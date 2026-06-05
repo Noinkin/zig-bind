@@ -21,7 +21,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 
        const inputDir = path.dirname(absoluteInputPath);
        const buildZigPath = path.join(inputDir, 'build.zig');
-       const coreEnginePath = path.resolve(__dirname, '../zig/zig_bind.zig').replace(/\\/g, '/');
+       const coreEnginePath = path.resolve(import.meta.dirname, '../zig/zig_bind.zig').replace(/\\/g, '/');
        const outputName = path.basename(inputFile, '.zig');
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
