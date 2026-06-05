@@ -10,7 +10,7 @@ async function runBenchmarkSuite() {
     const testCustomZigFile = path.join(__dirname, 'custom_math_bench.zig');
     const testWasmOutputDir = path.join(__dirname, 'dist_bench');
     const expectedWasmFile = path.join(testWasmOutputDir, 'custom_math_bench.wasm');
-    const cliBinaryPath = path.resolve(__dirname, '../dist/cli.cjs');
+    const cliBinaryPath = path.resolve(__dirname, '../dist/cli.js');
 
     console.log('⚡ Compiling Zig binaries for benchmark profiles...');
 

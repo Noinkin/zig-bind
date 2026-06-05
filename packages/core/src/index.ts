@@ -1,23 +1,27 @@
-export type ZigBindType = 'f32' | 'u32' | 'u8';
+export type ZigBindType = 'u8' | 'i8' | 'u16' | 'i16' | 'u32' | 'i32' | 'f32' | 'f64';
 
 export type ZigVector<T extends ZigBindType> = (
-    T extends 'f32' ? Float32Array : 
-    T extends 'u32' ? Uint32Array : 
-    Uint8Array
+    T extends 'u8' ? Uint8Array : T extends 'i8' ? Int8Array :
+    T extends 'u16' ? Uint16Array : T extends 'i16' ? Int16Array :
+    T extends 'u32' ? Uint32Array : T extends 'i32' ? Int32Array :
+    T extends 'f32' ? Float32Array : Float64Array
 ) & { ptr: number };
 
-const TYPE_SIZES: Record<ZigBindType, number> = { 'f32': 4, 'u32': 4, 'u8': 1 };
-const VIEW_TYPES: Record<ZigBindType, any> = { 'f32': Float32Array, 'u32': Uint32Array, 'u8': Uint8Array };
+const TYPE_METADATA: Record<ZigBindType, { Ctor: any, size: number }> = {
+    'u8': { Ctor: Uint8Array, size: 1 }, 'i8': { Ctor: Int8Array, size: 1 },
+    'u16': { Ctor: Uint16Array, size: 2 }, 'i16': { Ctor: Int16Array, size: 2 },
+    'u32': { Ctor: Uint32Array, size: 4 }, 'i32': { Ctor: Int32Array, size: 4 },
+    'f32': { Ctor: Float32Array, size: 4 }, 'f64': { Ctor: Float64Array, size: 8 }
+};
 
 /**
  * Zig/WASM binding registry
  */
 export class ZigBindRegistry {
-    private exports: any;
+    private readonly exports: any;
     public memory: WebAssembly.Memory;
-    
-    private viewCache = new Map<number, any>();
-    private lastBufferRef: ArrayBuffer | null = null;
+    private readonly encoder = new TextEncoder();
+    private readonly decoder = new TextDecoder();
 
     constructor(wasmInstance: WebAssembly.Instance) {
         this.exports = wasmInstance.exports;
@@ -28,30 +32,31 @@ export class ZigBindRegistry {
      * Allocates a slice of memory
      */
     alloc<T extends ZigBindType>(type: T, source: number | number[] | Float32Array | Uint32Array | Uint8Array): ZigVector<T> {
+        const meta = TYPE_METADATA[type];
         const isArray = Array.isArray(source) || ArrayBuffer.isView(source);
         const size = isArray ? (source as any).length : (source as number);
         
-        const byteLength = size * TYPE_SIZES[type];
-        const ptr = this.exports.zig_bind_alloc(byteLength);
-        
-        if (this.memory.buffer !== this.lastBufferRef) {
-            this.viewCache.clear();
-            this.lastBufferRef = this.memory.buffer;
-        }
+        const ptr = this.exports.zig_bind_alloc(size * meta.size);
+        const view = new meta.Ctor(this.memory.buffer, ptr, size) as any;
+        view.ptr = ptr;
 
-        let view = this.viewCache.get(ptr);
-        
-        if (!view || view.length !== size || view.constructor !== VIEW_TYPES[type]) {
-            view = new VIEW_TYPES[type](this.memory.buffer, ptr, size) as any;
-            view.ptr = ptr;
-            this.viewCache.set(ptr, view);
-        }
-        
-        if (isArray) {
-            view.set(source as any);
-        }
-        
+        if (isArray) view.set(source as any);
         return view;
+    }
+
+    writeString(str: string): { ptr: number, len: number } {
+        const bytes = this.encoder.encode(str);
+        const vec = this.alloc('u8', bytes);
+        return { ptr: vec.ptr, len: bytes.length };
+    }
+
+    writeObject(obj: any): { ptr: number, len: number } {
+        return this.writeString(JSON.stringify(obj));
+    }
+
+    readString(ptr: number, len: number): string {
+        const bytes = new Uint8Array(this.memory.buffer, ptr, len);
+        return this.decoder.decode(bytes);
     }
 
     /**

@@ -10,7 +10,7 @@ describe('User Custom Extension Pipeline Verification', () => {
     const testWasmOutputDir = path.join(__dirname, 'dist_test');
     const expectedWasmFile = path.join(testWasmOutputDir, 'custom_math_fixtures.wasm');
 
-    const cliBinaryPath = path.resolve(__dirname, '../dist/cli.cjs');
+    const cliBinaryPath = path.resolve(__dirname, '../dist/cli.js');
 
     beforeAll(() => {
         const customZigContent = `
@@ -25,6 +25,19 @@ describe('User Custom Extension Pipeline Verification', () => {
                 while (i < len) : (i += 1) {
                     c_ptr[i] = a_ptr[i] + b_ptr[i];
                 }
+            }
+
+            export fn process_string(ptr: [*]u8, len: usize) u32 {
+                _ = ptr; 
+                return @as(u32, @intCast(len));
+            }
+
+            export fn process_json(ptr: [*]u8, len: usize) i32 {
+                const json_slice = ptr[0..len];
+                const allocator = std.heap.page_allocator;
+                const parsed = std.json.parseFromSlice(struct { val: i32 }, allocator, json_slice, .{}) catch return -1;
+                defer parsed.deinit();
+                return parsed.value.val + 5;
             }
         `;
         fs.writeFileSync(testCustomZigFile, customZigContent);
@@ -52,5 +65,26 @@ describe('User Custom Extension Pipeline Verification', () => {
         add(vecA, vecB, vecC, 4);
 
         expect(Array.from(vecC)).toEqual([11.5, 22.5, 33.5, 44.5]);
+    });
+
+    test('should pass strings and JSON objects to Zig', async () => {
+        const wasmBuffer = fs.readFileSync(expectedWasmFile);
+        const wasmModule = await WebAssembly.instantiate(wasmBuffer, {});
+        
+        const registry = new ZigBindRegistry(wasmModule.instance);
+
+        const str = "Hello Zig";
+        const { ptr: sPtr, len: sLen } = registry.writeString(str);
+        const processString = registry.bind('process_string');
+        const strLenResult = processString(sPtr, sLen);
+        
+        expect(strLenResult).toBe(str.length);
+
+        const obj = { val: 10 };
+        const { ptr: jPtr, len: jLen } = registry.writeObject(obj);
+        const processJson = registry.bind('process_json');
+        const jsonResult = processJson(jPtr, jLen);
+        
+        expect(jsonResult).toBe(15);
     });
 });

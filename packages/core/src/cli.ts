@@ -10,7 +10,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
    .option('--out <dir>', 'Output directory', { default: './dist' })
    .action((inputFile, options) => {
        const absoluteInputPath = path.resolve(inputFile);
-       const outputDir = path.resolve(options.out);
+       const outputDir = path.resolve(options.out || './dist');
        
        if (!fs.existsSync(absoluteInputPath)) {
            console.error(`❌ Error: Input file not found at ${absoluteInputPath}`);
