@@ -1,0 +1,107 @@
+---
+title: Getting Started
+description: Learn how to install and configure zig-bind in your runtime environment.
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`zig-bind` is a high-performance, zero-allocation JavaScript and TypeScript binding engine for Zig WebAssembly. It bypasses heavy object wrapper abstractions, allowing you to interface directly with WebAssembly linear memory using standard, flyweight-cached JavaScript TypedArrays.
+
+## Installation
+
+Install the core registry package into your modern JavaScript runtime environment.
+
+<Tabs>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add zig-bind
+    ```
+  </TabItem>
+  <TabItem label="npm">
+    ```bash
+    npm install zig-bind
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add zig-bind
+    ```
+  </TabItem>
+</Tabs>
+
+## Quick Start Guide
+
+Follow these steps to configure your Zig memory hooks, instantiate your binding registry, and run zero-copy calculations.
+
+1. **Expose Allocation Hooks in Zig**
+   
+   Wire up the default allocation layer explicitly alongside your native functionality so the JavaScript runtime can map pointers cleanly:
+
+```zig
+// src/math.zig
+const std = @import("std");
+const zb = @import("zig_bind");
+
+// Required layout hooks for memory mapping
+export fn zig_bind_alloc(bytes: usize) [*]u8 { return zb.alloc(bytes); }
+export fn zig_bind_reset() void { zb.reset(); }
+
+// Your high-performance business logic
+export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {
+    var i: usize = 0;
+    while (i < len) : (i += 1) {
+        c_ptr[i] = a_ptr[i] + b_ptr[i];
+    }
+}
+```
+
+2. **Initialize the Core Registry**
+Compile your `.zig` code into a `.wasm` module using the `zig-bind` CLI tool, load the buffer, and feed it straight into the runtime registry wrapper:
+```typescript
+// src/index.ts
+import fs from 'node:fs';
+import { ZigBindRegistry } from 'zig-bind';
+
+// Load the compiled WebAssembly binary
+const wasmBuffer = fs.readFileSync('./dist/math.wasm');
+const { instance } = await WebAssembly.instantiate(wasmBuffer, {});
+
+// Instantiate the high-speed registry agent
+export const registry = new ZigBindRegistry(instance);
+
+```
+
+
+3. **Execute High-Speed, Zero-Copy Calculations**
+Allocate vectors with standard array-like developer experiences and run compiled native operations with zero garbage collection churn:
+```typescript
+import { registry } from './index.js';
+
+// 1. Instantly allocate and fill memory spaces using native syntax
+const vecA = registry.alloc('f32', [10.0, 20.0, 30.0, 40.0]);
+const vecB = registry.alloc('f32', 4);
+vecB.set([1.5, 2.5, 3.5, 4.5]); // Pure native TypedArray method!
+
+const vecC = registry.alloc('f32', 4);
+
+// 2. Bind the function name
+const add = registry.bind('add_vectors');
+
+// 3. Execute! Arity inferencing automatically passes trailing length arguments
+add(vecA, vecB, vecC);
+
+console.log(Array.from(vecC)); // [11.5, 22.5, 33.5, 44.5]
+
+// 4. Wipe arena tokens when finished to reuse pointers on the next frame
+registry.reset();
+
+```
+
+
+
+## Next Architecture Steps
+
+* **[Memory Management & Resets](https://www.google.com/search?q=/zig-bind/guides/memory-management/)** — Leverage the underlying flyweight cache strategies to guarantee zero GC footprint.
+* **[Binding Advanced Signatures](https://www.google.com/search?q=/zig-bind/guides/advanced-bindings/)** — Handle non-primitive matrices, structs, and complex multithreaded data streams.
+
+```

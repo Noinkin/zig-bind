@@ -1,0 +1,37 @@
+---
+title: zig-bind
+description: High-performance, Zig to WASM transformer.
+template: splash
+hero:
+  tagline: High-performance, Zig to WASM transformer.
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Get Started
+      link: /zig-bind/guides/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: API Reference
+      link: /zig-bind/api/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why zig-bind?
+
+<CardGrid stagger>
+    <Card title="Zero GC Overhead" icon="rocket">
+        Engineered with a smart flyweight caching layer that completely eliminates the V8 C++ object instantiation tax on your hot paths.
+    </Card>
+    <Card title="Native JavaScript DX" icon="code-branch">
+        No clumsy wrappers or nested `.view` middleman structures. Interact directly with standard TypedArrays using native methods like `.set()`.
+    </Card>
+    <Card title="Smart Arity Inferencing" icon="setting">
+        Automatically tracks pointer metadata and vector sizes, transparently auto-injecting trailing buffer length arguments into your Zig functions.
+    </Card>
+    <Card title="Zero-Copy Performance" icon="document">
+        Cross the WebAssembly boundary in single-digit nanoseconds using highly optimized, unrolled direct-invocation execution paths.
+    </Card>
+</CardGrid>

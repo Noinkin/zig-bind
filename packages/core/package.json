@@ -1,0 +1,48 @@
+{
+  "name": "zig-bind",
+  "description": "High-performance, Zig to WASM transformer.",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "homepage": "noinkin.github.io/zig-bind",
+  "files": [
+    "dist",
+    "zig"
+  ],
+  "bin": {
+    "zig-bind": "./dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noinkin/zig-bind.git",
+    "directory": "packages/core"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/**/*.ts",
+    "extract": "api-extractor run --local",
+    "test": "vitest run",
+    "bench": "pnpm tsx src/index.bench.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tinybench": "^6.0.2",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "cac": "^7.0.0"
+  }
+}

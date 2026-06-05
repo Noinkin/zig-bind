@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "lint": {},
+    "extract": {
+      "dependsOn": ["build"],
+      "outputs": ["etc/**", "../../temp/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "bench": {
+      "dependsOn": ["build"],
+      "outputs": []
+    }
+  }
+}

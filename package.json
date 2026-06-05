@@ -1,0 +1,34 @@
+{
+  "name": "zig-bind-monorepo",
+  "private": true,
+  "homepage": "noinkin.github.io/zig-bind",
+  "scripts": {
+    "build": "pnpm dlx turbo run build --filter=!apps-docs",
+    "lint": "pnpm dlx turbo run lint",
+    "format": "prettier --write \"packages/*/src/**/*.ts\"",
+    "extract": "pnpm dlx turbo run extract --filter=!apps-docs",
+    "docs:generate": "pnpm extract && api-documenter markdown -i temp -o apps/docs/src/content/docs/api && node apps/docs/inject-frontmatter.js",
+    "docs:build": "pnpm build && pnpm docs:generate && pnpm --filter apps-docs astro build",
+    "docs:dev": "pnpm build && pnpm docs:generate && pnpm --filter apps-docs astro dev",
+    "test": "pnpm dlx turbo run test --filter=!apps-docs",
+    "test:watch": "vitest",
+    "bench": "pnpm dlx turbo run bench --filter=!apps-docs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.27.0",
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@microsoft/api-documenter": "^7.30.5",
+    "@microsoft/api-extractor": "^7.58.7",
+    "@types/node": "^25.9.1",
+    "eslint": "^10.4.0",
+    "prettier": "^3.8.3",
+    "tsup": "^8.5.1",
+    "turbo": "^2.9.14",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}

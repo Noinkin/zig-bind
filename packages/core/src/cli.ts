@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { cac } from 'cac';
+
+const cli = cac('zig-bind');
+
+cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy framework')
+   .option('--out <dir>', 'Output directory', { default: './dist' })
+   .action((inputFile, options) => {
+       const absoluteInputPath = path.resolve(inputFile);
+       const outputDir = path.resolve(options.out);
+       
+       if (!fs.existsSync(absoluteInputPath)) {
+           console.error(`❌ Error: Input file not found at ${absoluteInputPath}`);
+           process.exit(1);
+       }
+
+       fs.mkdirSync(outputDir, { recursive: true });
+
+       const inputDir = path.dirname(absoluteInputPath);
+       const buildZigPath = path.join(inputDir, 'build.zig');
+       const coreEnginePath = path.resolve(__dirname, '../zig/zig_bind.zig').replace(/\\/g, '/');
+       const outputName = path.basename(inputFile, '.zig');
+       const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
+
+       const buildZigContent = `const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+
+    const root_mod = b.createModule(.{
+        .root_source_file = b.path("${path.basename(inputFile)}"),
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "${outputName}",
+        .root_module = root_mod,
+    });
+
+    exe.entry = .disabled;
+    exe.rdynamic = true;
+
+    const zb_mod = b.addModule("zig_bind", .{
+        .root_source_file = .{ .cwd_relative = "${coreEnginePath}" },
+    });
+    exe.root_module.addImport("zig_bind", zb_mod);
+
+    const install = b.addInstallArtifact(exe, .{});
+    b.getInstallStep().dependOn(&install.step);
+}
+`;
+
+       fs.writeFileSync(buildZigPath, buildZigContent);
+
+       console.log(`⚡ Compiling: ${inputFile}...`);
+
+       try {
+           const localCacheDir = path.join(inputDir, '.zig-global-cache');
+           
+           execSync(`zig build --global-cache-dir "${localCacheDir}"`, { 
+               cwd: inputDir,
+               stdio: 'inherit',
+               env: {
+                   ...process.env,
+                   LOCALAPPDATA: path.join(inputDir, '.zig-appdata'),
+                   USERPROFILE: inputDir,
+                   HOME: inputDir
+               }
+           });
+
+           const buildOutputPath = path.join(inputDir, 'zig-out', 'bin', `${outputName}.wasm`);
+           if (fs.existsSync(buildOutputPath)) {
+               fs.copyFileSync(buildOutputPath, finalWasmOutput);
+               console.log(`🎉 Done! Generated at: ${finalWasmOutput}`);
+           }
+       } catch (err) {
+           console.error('❌ Zig Compilation Failed.');
+       } finally {
+           if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
+           const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
+           for (const dir of dirs) {
+               const p = path.join(inputDir, dir);
+               if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
+           }
+       }
+   });
+
+cli.help();
+cli.parse();

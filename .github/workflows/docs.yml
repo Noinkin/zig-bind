@@ -1,0 +1,53 @@
+name: Deploy Documentation Site
+
+on:
+  push:
+    branches: [ main ]
+
+# Grants permissions to write to GitHub Pages deployment contexts
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm package manager
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Monorepo Dependencies
+        run: pnpm install
+
+      - name: Compile Code, Extract Metadata, and Build Starlight Site
+        run: pnpm docs:build
+
+      - name: Upload Static Build Artifacts
+        uses: actions/configure-pages@v4
+        
+      - name: Upload Built Site Directory
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/docs/dist
+
+      - name: Deploy Site to GitHub Pages Cloud Infrastructure
+        id: deployment
+        uses: actions/deploy-pages@v4
