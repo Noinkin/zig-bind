@@ -38,8 +38,6 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
             });
         `).join('');
 
-        const includePath = fs.existsSync(libDir) ? `exe.addIncludePath(b.path("lib"));` : '';
-
         const buildZigContent = `const std = @import("std");
 
 pub fn build(b: *std.Build) void {
@@ -62,8 +60,6 @@ pub fn build(b: *std.Build) void {
     exe.entry = .disabled;
     exe.rdynamic = true;
     
-    // Add C support
-    ${includePath}
     ${cSourceInclusion}
 
     const zb_mod = b.addModule("zig_bind", .{
