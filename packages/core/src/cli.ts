@@ -34,7 +34,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
         const cSourceInclusion = cFiles.map(file => `
             exe.root_module.addCSourceFile(.{
                 .file = b.path("${file}"),
-                .flags = &.{"-O3"m "-DXXH_NO_LIBC"},
+                .flags = &.{"-O3", "-DXXH_NO_LIBC"},
             });
         `).join('');
 
