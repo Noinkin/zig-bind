@@ -70,25 +70,6 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/map:
-    dependencies:
-      zig-bind:
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: ^25.9.1
-        version: 25.9.1
-      tinybench:
-        specifier: ^6.0.2
-        version: 6.0.2
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(@microsoft/api-extractor@7.58.7(@types/node@25.9.1))(postcss@8.5.15)(typescript@6.0.3)
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
 packages:
 
   '@astrojs/compiler@4.0.0':

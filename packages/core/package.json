@@ -27,7 +27,7 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "tsup",
+    "build": "pnpm tsup",
     "lint": "eslint src/**/*.ts",
     "extract": "api-extractor run --local",
     "test": "vitest run",
