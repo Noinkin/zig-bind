@@ -25,7 +25,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const outputName = path.basename(inputFile, '.zig');
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
-       const libDir = path.join(inputDir, 'lib');
+       const libDir = path.join(inputDir, '../lib');
         let cFiles: string[] = [];
         if (fs.existsSync(libDir)) {
             cFiles = fs.readdirSync(libDir).filter(file => file.endsWith('.c'));
