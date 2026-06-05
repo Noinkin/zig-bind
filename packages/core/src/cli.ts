@@ -26,17 +26,8 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
        const libDir = path.join(inputDir, '../lib');
-        let cFiles: string[] = [];
-        if (fs.existsSync(libDir)) {
-            cFiles = fs.readdirSync(libDir).filter(file => file.endsWith('.c'));
-        }
 
-        const cSourceInclusion = cFiles.map(file => `
-            exe.addCSourceFile(.{
-                .file = b.path("lib/${file}"),
-                .flags = &.{"-O3"},
-            });
-        `).join('');
+        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
 
         const buildZigContent = `const std = @import("std");
 
@@ -60,7 +51,7 @@ pub fn build(b: *std.Build) void {
     exe.entry = .disabled;
     exe.rdynamic = true;
     
-    ${cSourceInclusion}
+    ${includePath}
 
     const zb_mod = b.addModule("zig_bind", .{
         .root_source_file = .{ .cwd_relative = "${coreEnginePath}" },
