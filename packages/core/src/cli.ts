@@ -35,12 +35,16 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const noLibcContent = `
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
+
 #define XXH_NO_LIBC 1
 #define XXH_NO_STDLIB 1
-#define XXH_NO_STRING 1
-#define XXH_FORCE_MEMORY_ACCESS 1
+
+#define XXH_memcpy(d, s, n) __builtin_memcpy(d, s, n)
+#define XXH_memset(d, c, n) __builtin_memset(d, c, n)
+#define XXH_memcmp(s1, s2, n) __builtin_memcmp(s1, s2, n)
+
 #endif
-       `;
+`;
        fs.writeFileSync(noLibcPath, noLibcContent);
        const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
 
@@ -116,7 +120,7 @@ pub fn build(b: *std.Build) void {
        } finally {
            if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
            if (fs.existsSync(noLibcPath)) fs.unlinkSync(noLibcPath);
-           
+
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
            for (const dir of dirs) {
                const p = path.join(inputDir, dir);
