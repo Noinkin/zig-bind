@@ -48,7 +48,13 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        
        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
 
+       const injectPath = path.join(inputDir, 'build_inject.zig');
+       let injectedCode = '';
+       if (fs.existsSync(injectPath)) injectedCode = fs.readFileSync(injectPath, 'utf-8');
+
        const buildZigContent = `const std = @import("std");
+
+// THIS FILE IS AUTO GENERATED, TO INJECT LINES MAKE A 'build_inject.zig' FILE IN THE INPUT DIRECTORY
 
 pub fn build(b: *std.Build) void {
     ${isShared ? `
@@ -87,6 +93,8 @@ pub fn build(b: *std.Build) void {
     ${includePath}
     ${cSourceInclusion}
 
+    ${injectedCode}
+
     const zb_mod = b.addModule("zig_bind", .{
         .root_source_file = .{ .cwd_relative = "${coreEnginePath}" },
     });
@@ -122,7 +130,6 @@ pub fn build(b: *std.Build) void {
        } catch (err) {
            console.error('❌ Zig Compilation Failed.');
        } finally {
-           if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
            for (const dir of dirs) {
                const p = path.join(inputDir, dir);
