@@ -68,10 +68,16 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
         const buildZigContent = `const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    var features = std.Target.Cpu.Feature.Set.empty;
+    ${isShared ? `
+    features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
+    features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
+    ` : ''}
+
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .freestanding,${isShared ? `
-        .cpu_features_add = std.Target.Cpu.Feature.Set.empty.withFeature(@intFromEnum(std.Target.wasm.Feature.atomics)).withFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory)),` : ''}
+        .os_tag = .freestanding,
+        .cpu_features_add = features,
     });
 
     const root_mod = b.createModule(.{
