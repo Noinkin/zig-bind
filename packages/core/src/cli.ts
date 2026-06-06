@@ -70,7 +70,8 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .freestanding,${isShared ? `\n        .cpu_features_add = std.Target.wasm.featureSet(&.{ .atomics, .bulk_memory }),` : ''}
+        .os_tag = .freestanding,${isShared ? `
+        .cpu_features_add = std.Target.Cpu.Feature.Set.empty.withFeature(@intFromEnum(std.Target.wasm.Feature.atomics)).withFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory)),` : ''}
     });
 
     const root_mod = b.createModule(.{
