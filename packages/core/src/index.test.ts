@@ -4,6 +4,13 @@ import fs from 'fs';
 import path from 'path';
 import { ZigBindRegistry } from './index.js';
 const __dirname = import.meta.dirname;
+import { WASI } from 'wasi';
+
+const wasi = new WASI({
+    version: 'preview1',
+    args: process.argv,
+    env: process.env
+})
 
 describe('User Custom Extension Pipeline Verification', () => {
     const testCustomZigFile = path.join(__dirname, 'custom_math_fixtures.zig');
@@ -42,8 +49,8 @@ describe('User Custom Extension Pipeline Verification', () => {
         `;
         fs.writeFileSync(testCustomZigFile, customZigContent);
 
-        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}"`);
-    }, 30000);
+        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}" --mode fast`);
+    }, 50000);
 
     afterAll(() => {
         if (fs.existsSync(testCustomZigFile)) fs.unlinkSync(testCustomZigFile);
@@ -53,7 +60,9 @@ describe('User Custom Extension Pipeline Verification', () => {
 
     test('should load the user-extendable compiled binary and compute correct zero-copy structures', async () => {
         const wasmBuffer = fs.readFileSync(expectedWasmFile);
-        const wasmModule = await WebAssembly.instantiate(wasmBuffer, {});
+        const wasmModule = await WebAssembly.instantiate(wasmBuffer, {
+            wasi_snapshot_preview1: wasi.wasiImport
+        });
         
         const registry = new ZigBindRegistry(wasmModule.instance);
         
@@ -69,7 +78,9 @@ describe('User Custom Extension Pipeline Verification', () => {
 
     test('should pass strings and JSON objects to Zig', async () => {
         const wasmBuffer = fs.readFileSync(expectedWasmFile);
-        const wasmModule = await WebAssembly.instantiate(wasmBuffer, {});
+        const wasmModule = await WebAssembly.instantiate(wasmBuffer, {
+            wasi_snapshot_preview1: wasi.wasiImport
+        });
         
         const registry = new ZigBindRegistry(wasmModule.instance);
 

@@ -3,6 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { ZigBindRegistry } from './index.js';
+import { WASI } from 'wasi';
+
+const wasi = new WASI({
+    version: 'preview1',
+    args: process.argv,
+    env: process.env
+})
 
 const __dirname = import.meta.dirname;
 
@@ -40,8 +47,10 @@ async function runBenchmarkSuite() {
     execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}"`);
 
     const wasmBuffer = fs.readFileSync(expectedWasmFile);
-    const wasmModule = new WebAssembly.Module(wasmBuffer);
-    const wasmInstance = new WebAssembly.Instance(wasmModule, {});
+    const wasmModule = await WebAssembly.instantiate(wasmBuffer, {
+        wasi_snapshot_preview1: wasi.wasiImport
+    });
+    const wasmInstance = wasmModule.instance;
     const exports = wasmInstance.exports as any;
     const memory = exports.memory as WebAssembly.Memory;
     const registry = new ZigBindRegistry(wasmInstance);

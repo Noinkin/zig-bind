@@ -23,10 +23,13 @@ const cli = cac('zig-bind');
 cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy framework')
    .option('--out <dir>', 'Output directory', { default: './dist' })
    .option('--shared', 'Enable shared memory and atomics for multi-threaded worker pools')
+   .option('--mode <mode>', 'Build mode: debug, fast, small', { default: 'fast' })
+   .option('--clean', 'Force a clean build by clearing caches')
    .action((inputFile, options) => {
        const absoluteInputPath = path.resolve(inputFile);
        const outputDir = path.resolve(options.out || './dist');
        const isShared = !!options.shared;
+       const mode: string = options.mode;
        
        if (!fs.existsSync(absoluteInputPath)) {
            console.error(`❌ Error: Input file not found at ${absoluteInputPath}`);
@@ -67,16 +70,26 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        let injectedCode = '';
        if (fs.existsSync(injectPath)) injectedCode = fs.readFileSync(injectPath, 'utf-8');
 
+       const optimizeMap: Record<string, string> = {
+           'debug': '.Debug',
+           'fast': '.ReleaseFast',
+           'small': '.ReleaseSmall'
+       };
+
+       const optimize: string = optimizeMap[mode] || '.ReleaseFast';
+
        const buildZigContent = `const std = @import("std");
 
 // THIS FILE IS AUTO GENERATED, TO INJECT LINES MAKE A 'build_inject.zig' FILE IN THE INPUT DIRECTORY
 
 pub fn build(b: *std.Build) void {
-    ${isShared ? `
     var features = std.Target.Cpu.Feature.Set.empty;
+    ${isShared ? `
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
-    ` : 'const features = std.Target.Cpu.Feature.Set.empty;'}
+    ` : ''}
+
+    features.addFeature(@intFromEnum(std.Target.wasm.Feature.simd128));
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
@@ -87,7 +100,7 @@ pub fn build(b: *std.Build) void {
     const root_mod = b.createModule(.{
         .root_source_file = b.path("${path.basename(inputFile)}"),
         .target = target,
-        .optimize = .ReleaseFast,
+        .optimize = ${optimize},
     });
 
     const exe = b.addExecutable(.{
@@ -126,15 +139,12 @@ pub fn build(b: *std.Build) void {
 
        try {
            const localCacheDir = path.join(inputDir, '.zig-global-cache');
-           execSync(`zig build --global-cache-dir "${localCacheDir}"`, { 
+           const cleanArg = options.clean ? "--cache-clean" : "";
+           
+           execSync(`zig build --global-cache-dir "${localCacheDir} ${cleanArg}`, { 
                cwd: inputDir,
                stdio: 'inherit',
-               env: {
-                   ...process.env,
-                   LOCALAPPDATA: path.join(inputDir, '.zig-appdata'),
-                   USERPROFILE: inputDir,
-                   HOME: inputDir
-               }
+               env: { ...process.env } // Remove the forced directory overriding, let Zig handle defaults
            });
 
            const buildOutputPath = path.join(inputDir, 'zig-out', 'bin', `${outputName}.wasm`);
