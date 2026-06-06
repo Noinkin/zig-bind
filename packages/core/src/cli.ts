@@ -31,16 +31,27 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
             cFiles = fs.readdirSync(libDir).filter(file => file.endsWith('.c'));
         }
 
+        const noLibcPath = path.join(inputDir, 'no_libc.h');
+       const noLibcContent = `
+#ifndef NO_LIBC_H
+#define NO_LIBC_H
+#define XXH_NO_LIBC 1
+#define XXH_NO_STDLIB 1
+#define XXH_NO_STRING 1
+#define XXH_FORCE_MEMORY_ACCESS 1
+#endif
+       `;
+       fs.writeFileSync(noLibcPath, noLibcContent);
+       const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
+
         const cSourceInclusion = cFiles.map(file => `
             exe.root_module.addCSourceFile(.{
                 .file = b.path("${file}"),
-                .flags = &.{"-O3", "-DXXH_NO_LIBC"},
+                .flags = &.{"-O3", "-include", "${safeNoLibcPath}"},
             });
         `).join('');
         
-        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));
-exe.root_module.addIncludePath(b.path("lib/include"));` : '';
-        if(includePath != '') ensureStubHeaders(libDir);
+        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
 
         const buildZigContent = `const std = @import("std");
 
@@ -104,6 +115,8 @@ pub fn build(b: *std.Build) void {
            console.error('❌ Zig Compilation Failed.');
        } finally {
            if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
+           if (fs.existsSync(noLibcPath)) fs.unlinkSync(noLibcPath);
+           
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
            for (const dir of dirs) {
                const p = path.join(inputDir, dir);
@@ -111,33 +124,6 @@ pub fn build(b: *std.Build) void {
            }
        }
    });
-
-function ensureStubHeaders(libDir: string) {
-    const stubDir = path.join(libDir, 'include');
-    if (!fs.existsSync(stubDir)) {
-        fs.mkdirSync(stubDir);
-    }
-
-    const stdlibContent = `
-#pragma once
-#include <stddef.h> // Provides size_t
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
-// Empty malloc/free stubs to satisfy the preprocessor
-void* malloc(size_t size);
-void free(void* ptr);
-`;
-    fs.writeFileSync(path.join(stubDir, 'stdlib.h'), stdlibContent);
-
-    const stringContent = `
-#pragma once
-#include <stddef.h>
-void* memcpy(void* dest, const void* src, size_t n);
-void* memset(void* s, int c, size_t n);
-`;
-    fs.writeFileSync(path.join(stubDir, 'string.h'), stringContent);
-}
 
 cli.help();
 cli.parse();
