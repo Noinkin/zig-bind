@@ -35,7 +35,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
            cFiles = files.filter(file => file.endsWith('.c'));
        }
 
-       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory"];
+       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-Ilib"];
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
