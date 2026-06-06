@@ -8,9 +8,11 @@ const cli = cac('zig-bind');
 
 cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy framework')
    .option('--out <dir>', 'Output directory', { default: './dist' })
+   .option('--shared', 'Enable shared memory and atomics for multi-threaded worker pools')
    .action((inputFile, options) => {
        const absoluteInputPath = path.resolve(inputFile);
        const outputDir = path.resolve(options.out || './dist');
+       const isShared = !!options.shared;
        
        if (!fs.existsSync(absoluteInputPath)) {
            console.error(`❌ Error: Input file not found at ${absoluteInputPath}`);
@@ -48,10 +50,16 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        fs.writeFileSync(noLibcPath, noLibcContent);
        const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
 
+       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-include", safeNoLibcPath];
+       if (isShared) {
+           baseCFlags.push("-matomics");
+       }
+       const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
+
         const cSourceInclusion = cFiles.map(file => `
             exe.root_module.addCSourceFile(.{
                 .file = b.path("${file}"),
-                .flags = &.{"-O3", "-msimd128", "-mbulk-memory", "-include", "${safeNoLibcPath}"},
+                .flags = &.{${formattedCFlags}},
             });
         `).join('');
         
@@ -62,7 +70,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .freestanding,
+        .os_tag = .freestanding,${isShared ? `\n        .cpu_features_add = std.Target.wasm.featureSet(&.{ .atomics, .bulk_memory }),` : ''}
     });
 
     const root_mod = b.createModule(.{
@@ -78,6 +86,7 @@ pub fn build(b: *std.Build) void {
 
     exe.entry = .disabled;
     exe.rdynamic = true;
+    ${isShared ? 'exe.import_memory = true;' : ''}
     
     ${includePath}
     ${cSourceInclusion}
@@ -94,7 +103,7 @@ pub fn build(b: *std.Build) void {
 
        fs.writeFileSync(buildZigPath, buildZigContent);
 
-       console.log(`⚡ Compiling: ${inputFile}...`);
+       console.log(`⚡ Compiling: ${inputFile} ${isShared ? '(Shared Threads Enabled)' : ''}...`);
 
        try {
            const localCacheDir = path.join(inputDir, '.zig-global-cache');
