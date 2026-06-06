@@ -74,6 +74,8 @@ pub fn build(b: *std.Build) void {
         .root_module = root_mod,
     });
 
+    exe.linkLibC();
+
     exe.entry = .disabled;
     exe.rdynamic = true;
     ${isShared ? `
