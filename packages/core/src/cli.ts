@@ -38,12 +38,10 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
                const filePath = path.join(libDir, f);
                if (f.endsWith('.h') || f.endsWith('.c')) {
                    const content = fs.readFileSync(filePath, 'utf-8');
-                   
                    if (f.endsWith('.h')) {
                        const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
                        detectedLibs.add(libName);
                    }
-
                    const matches = content.matchAll(/^#\s*include\s*[<]([^>]+)[>]/gm);
                    for (const match of matches) {
                        neededIncludes.add(match[1]);
@@ -59,50 +57,27 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
 
+#include <stddef.h>
+
 #define _STRING_H
 #define _MATH_H
 #define _STDLIB_H
 #define _STDIO_H
 #define _STDDEF_H
 
-#include <stddef.h> // Ensure basic types like size_t exist
+static inline void* memcpy(void* d, const void* s, unsigned long n) { return __builtin_memcpy(d, s, n); }
+static inline void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
+static inline void* memmove(void* d, const void* s, unsigned long n) { return __builtin_memmove(d, s, n); }
+static inline int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
 
-void* memcpy(void* dest, const void* src, unsigned long n) { return __builtin_memcpy(dest, src, n); }
-void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
-void* memmove(void* dest, const void* src, unsigned long n) { return __builtin_memmove(dest, src, n); }
-int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
-
-float sqrtf(float x) { return __builtin_sqrtf(x); }
-float cosf(float x) { return __builtin_cosf(x); }
-float sinf(float x) { return __builtin_sinf(x); }
-float tanf(float x) { return __builtin_tanf(x); }
-float floorf(float x) { return __builtin_floorf(x); }
-float ceilf(float x) { return __builtin_ceilf(x); }
-float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
+static inline float sqrtf(float x) { return __builtin_sqrtf(x); }
+static inline float cosf(float x) { return __builtin_cosf(x); }
+static inline float sinf(float x) { return __builtin_sinf(x); }
+static inline float tanf(float x) { return __builtin_tanf(x); }
+static inline float floorf(float x) { return __builtin_floorf(x); }
+static inline float ceilf(float x) { return __builtin_ceilf(x); }
+static inline float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
 `;
-
-       if (neededIncludes.has('string.h')) {
-           noLibcContent += `
-#define _STRING_H
-void* memcpy(void* d, const void* s, unsigned long n) { return __builtin_memcpy(d, s, n); }
-void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
-void* memmove(void* d, const void* s, unsigned long n) { return __builtin_memmove(d, s, n); }
-int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
-`;
-       }
-
-       if (neededIncludes.has('math.h')) {
-           noLibcContent += `
-#define _MATH_H
-float sqrtf(float x) { return __builtin_sqrtf(x); }
-float cosf(float x) { return __builtin_cosf(x); }
-float sinf(float x) { return __builtin_sinf(x); }
-float tanf(float x) { return __builtin_tanf(x); }
-float floorf(float x) { return __builtin_floorf(x); }
-float ceilf(float x) { return __builtin_ceilf(x); }
-float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
-`;
-       }
 
        detectedLibs.forEach(lib => {
            noLibcContent += `\n#define ${lib}_NO_LIBC 1\n#define ${lib}_NO_STDLIB 1`;
@@ -112,15 +87,7 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
        fs.writeFileSync(noLibcPath, noLibcContent);
 
        const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
-       const baseCFlags = [
-            "-O3", 
-            "-msimd128", 
-            "-mbulk-memory", 
-            "-include", safeNoLibcPath,
-            "-D_STRING_H", 
-            "-D_MATH_H", 
-            "-D_STDLIB_H"
-        ];
+       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-include", safeNoLibcPath];
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
