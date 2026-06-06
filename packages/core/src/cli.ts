@@ -59,6 +59,26 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
 
+#define _STRING_H
+#define _MATH_H
+#define _STDLIB_H
+#define _STDIO_H
+#define _STDDEF_H
+
+#include <stddef.h> // Ensure basic types like size_t exist
+
+void* memcpy(void* dest, const void* src, unsigned long n) { return __builtin_memcpy(dest, src, n); }
+void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
+void* memmove(void* dest, const void* src, unsigned long n) { return __builtin_memmove(dest, src, n); }
+int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
+
+float sqrtf(float x) { return __builtin_sqrtf(x); }
+float cosf(float x) { return __builtin_cosf(x); }
+float sinf(float x) { return __builtin_sinf(x); }
+float tanf(float x) { return __builtin_tanf(x); }
+float floorf(float x) { return __builtin_floorf(x); }
+float ceilf(float x) { return __builtin_ceilf(x); }
+float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
 `;
 
        if (neededIncludes.has('string.h')) {
@@ -92,7 +112,15 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
        fs.writeFileSync(noLibcPath, noLibcContent);
 
        const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
-       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-include", safeNoLibcPath];
+       const baseCFlags = [
+            "-O3", 
+            "-msimd128", 
+            "-mbulk-memory", 
+            "-include", safeNoLibcPath,
+            "-D_STRING_H", 
+            "-D_MATH_H", 
+            "-D_STDLIB_H"
+        ];
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
