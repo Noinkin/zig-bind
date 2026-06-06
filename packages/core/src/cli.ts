@@ -45,6 +45,19 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 #define XXH_memset(d, c, n) __builtin_memset(d, c, n)
 #define XXH_memcmp(s1, s2, n) __builtin_memcmp(s1, s2, n)
 
+#define _STRING_H
+#define _MATH_H
+
+void* memcpy(void* dest, const void* src, unsigned long n) { return __builtin_memcpy(dest, src, n); }
+void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
+float sqrtf(float x) { return __builtin_sqrtf(x); }
+float cosf(float x) { return __builtin_cosf(x); }
+float sinf(float x) { return __builtin_sinf(x); }
+float tanf(float x) { return __builtin_tanf(x); }
+float floorf(float x) { return __builtin_floorf(x); }
+float ceilf(float x) { return __builtin_ceilf(x); }
+float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
+
 #endif
 `;
        fs.writeFileSync(noLibcPath, noLibcContent);
