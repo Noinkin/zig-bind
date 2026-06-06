@@ -28,66 +28,14 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
        const libDir = path.join(inputDir, '../lib');
-       const detectedLibs = new Set();
-       const neededIncludes = new Set();
        let cFiles: any[] = [];
 
        if (fs.existsSync(libDir)) {
            const files = fs.readdirSync(libDir);
-           files.forEach(f => {
-               const filePath = path.join(libDir, f);
-               if (f.endsWith('.h') || f.endsWith('.c')) {
-                   const content = fs.readFileSync(filePath, 'utf-8');
-                   if (f.endsWith('.h')) {
-                       const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-                       detectedLibs.add(libName);
-                   }
-                   const matches = content.matchAll(/^#\s*include\s*[<]([^>]+)[>]/gm);
-                   for (const match of matches) {
-                       neededIncludes.add(match[1]);
-                   }
-               }
-           });
            cFiles = files.filter(file => file.endsWith('.c'));
        }
 
-       const noLibcPath = path.join(inputDir, 'no_libc.h');
-       
-       let noLibcContent = `
-#ifndef NO_LIBC_H
-#define NO_LIBC_H
-
-#include <stddef.h>
-
-#define _STRING_H
-#define _MATH_H
-#define _STDLIB_H
-#define _STDIO_H
-#define _STDDEF_H
-
-static inline void* memcpy(void* d, const void* s, unsigned long n) { return __builtin_memcpy(d, s, n); }
-static inline void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
-static inline void* memmove(void* d, const void* s, unsigned long n) { return __builtin_memmove(d, s, n); }
-static inline int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
-
-static inline float sqrtf(float x) { return __builtin_sqrtf(x); }
-static inline float cosf(float x) { return __builtin_cosf(x); }
-static inline float sinf(float x) { return __builtin_sinf(x); }
-static inline float tanf(float x) { return __builtin_tanf(x); }
-static inline float floorf(float x) { return __builtin_floorf(x); }
-static inline float ceilf(float x) { return __builtin_ceilf(x); }
-static inline float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
-`;
-
-       detectedLibs.forEach(lib => {
-           noLibcContent += `\n#define ${lib}_NO_LIBC 1\n#define ${lib}_NO_STDLIB 1`;
-       });
-
-       noLibcContent += `\n#endif`;
-       fs.writeFileSync(noLibcPath, noLibcContent);
-
-       const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
-       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-include", safeNoLibcPath];
+       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory"];
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
@@ -111,7 +59,7 @@ pub fn build(b: *std.Build) void {
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .freestanding,
+        .os_tag = .wasi,
         .cpu_features_add = features,
     });
 
@@ -149,7 +97,6 @@ pub fn build(b: *std.Build) void {
 
        fs.writeFileSync(buildZigPath, buildZigContent);
 
-       console.log(`⚡ Detected Libraries: ${Array.from(detectedLibs).join(', ')}`);
        console.log(`⚡ Compiling: ${inputFile}...`);
 
        try {
@@ -174,7 +121,6 @@ pub fn build(b: *std.Build) void {
            console.error('❌ Zig Compilation Failed.');
        } finally {
            if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
-           if (fs.existsSync(noLibcPath)) fs.unlinkSync(noLibcPath);
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
            for (const dir of dirs) {
                const p = path.join(inputDir, dir);
