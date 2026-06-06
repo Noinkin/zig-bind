@@ -4,6 +4,20 @@ import fs from 'fs';
 import path from 'path';
 import { cac } from 'cac';
 
+const getRecursiveFiles = (dir: any) => {
+    let files: any[] = [];
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        if (item.isDirectory()) {
+            files = files.concat(getRecursiveFiles(fullPath));
+        } else if (item.name.endsWith('.c')) {
+            files.push(fullPath);
+        }
+    }
+    return files;
+};
+
 const cli = cac('zig-bind');
 
 cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy framework')
@@ -31,20 +45,21 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        let cFiles: any[] = [];
 
        if (fs.existsSync(libDir)) {
-           const files = fs.readdirSync(libDir);
-           cFiles = files.filter(file => file.endsWith('.c'));
+           cFiles = getRecursiveFiles(libDir);
        }
 
        const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-Ilib"];
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
-       const cSourceInclusion = cFiles.map(file => `
+       const cSourceInclusion = cFiles.map(file => {
+        const relativePath = path.relative(inputDir, file).replace(/\\/g, '/');
+        return `
            exe.root_module.addCSourceFile(.{
-               .file = b.path("${file}"),
+               .file = b.path("${relativePath}"),
                .flags = &.{${formattedCFlags}},
            });
-       `).join('');
+       `}).join('');
        
        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
 
