@@ -39,7 +39,7 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
         `).join('');
         
         const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));
-exe.root_module.addIncludePath(b.path("lib/include"))` : '';
+exe.root_module.addIncludePath(b.path("lib/include"));` : '';
         if(includePath != '') ensureStubHeaders(libDir);
 
         const buildZigContent = `const std = @import("std");
