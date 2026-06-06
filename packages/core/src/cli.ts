@@ -79,7 +79,7 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
 
        const cSourceInclusion = cFiles.map(file => `
            exe.root_module.addCSourceFile(.{
-               .file = b.path("lib/${file}"),
+               .file = b.path("${file}"),
                .flags = &.{${formattedCFlags}},
            });
        `).join('');
