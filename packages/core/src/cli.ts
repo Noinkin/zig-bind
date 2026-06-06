@@ -27,27 +27,38 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const outputName = path.basename(inputFile, '.zig');
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
+       // --- SMART LIBRARY DETECTION ---
        const libDir = path.join(inputDir, '../lib');
-        let cFiles: string[] = [];
-        if (fs.existsSync(libDir)) {
-            cFiles = fs.readdirSync(libDir).filter(file => file.endsWith('.c'));
-        }
+       const detectedLibs = new Set();
+       let cFiles: any[] = [];
 
-        const noLibcPath = path.join(inputDir, 'no_libc.h');
-       const noLibcContent = `
+       if (fs.existsSync(libDir)) {
+           const files = fs.readdirSync(libDir);
+           // Detect all .h files to define library-specific macros
+           files.forEach(f => {
+               if (f.endsWith('.h')) {
+                   const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+                   detectedLibs.add(libName);
+               }
+           });
+           // Collect .c files for compilation
+           cFiles = files.filter(file => file.endsWith('.c'));
+       }
+
+       // --- DYNAMIC NO_LIBC GENERATOR ---
+       const noLibcPath = path.join(inputDir, 'no_libc.h');
+       
+       // Start with generic system overrides
+       let noLibcContent = `
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
 
-#define XXH_NO_LIBC 1
-#define XXH_NO_STDLIB 1
-
-#define XXH_memcpy(d, s, n) __builtin_memcpy(d, s, n)
-#define XXH_memset(d, c, n) __builtin_memset(d, c, n)
-#define XXH_memcmp(s1, s2, n) __builtin_memcmp(s1, s2, n)
-
+// System Header Guards
 #define _STRING_H
 #define _MATH_H
+#define _STDLIB_H
 
+// Generic System Overrides
 void* memcpy(void* dest, const void* src, unsigned long n) { return __builtin_memcpy(dest, src, n); }
 void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
 float sqrtf(float x) { return __builtin_sqrtf(x); }
@@ -57,28 +68,32 @@ float tanf(float x) { return __builtin_tanf(x); }
 float floorf(float x) { return __builtin_floorf(x); }
 float ceilf(float x) { return __builtin_ceilf(x); }
 float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
-
-#endif
 `;
-       fs.writeFileSync(noLibcPath, noLibcContent);
-       const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
 
+       // Inject detected library macros automatically
+       detectedLibs.forEach(lib => {
+           noLibcContent += `\n#define ${lib}_NO_LIBC 1\n#define ${lib}_NO_STDLIB 1`;
+       });
+
+       noLibcContent += `\n#endif`;
+       fs.writeFileSync(noLibcPath, noLibcContent);
+
+       const safeNoLibcPath = noLibcPath.replace(/\\/g, '/');
        const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-include", safeNoLibcPath];
-       if (isShared) {
-           baseCFlags.push("-matomics");
-       }
+       if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
-        const cSourceInclusion = cFiles.map(file => `
-            exe.root_module.addCSourceFile(.{
-                .file = b.path("${file}"),
-                .flags = &.{${formattedCFlags}},
-            });
-        `).join('');
-        
-        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
+       // --- BUILD SCRIPT GENERATION ---
+       const cSourceInclusion = cFiles.map(file => `
+           exe.root_module.addCSourceFile(.{
+               .file = b.path("lib/${file}"),
+               .flags = &.{${formattedCFlags}},
+           });
+       `).join('');
+       
+       const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
 
-        const buildZigContent = `const std = @import("std");
+       const buildZigContent = `const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     var features = std.Target.Cpu.Feature.Set.empty;
@@ -109,7 +124,6 @@ pub fn build(b: *std.Build) void {
     ${isShared ? `
     exe.import_memory = true;
     exe.shared_memory = true;
-
     exe.max_memory = 8192 * 65536;
     ` : ''}
     
@@ -128,11 +142,12 @@ pub fn build(b: *std.Build) void {
 
        fs.writeFileSync(buildZigPath, buildZigContent);
 
-       console.log(`⚡ Compiling: ${inputFile} ${isShared ? '(Shared Threads Enabled)' : ''}...`);
+       console.log(`⚡ Detected Libraries: ${Array.from(detectedLibs).join(', ')}`);
+       console.log(`⚡ Compiling: ${inputFile}...`);
 
+       // --- EXECUTION ---
        try {
            const localCacheDir = path.join(inputDir, '.zig-global-cache');
-           
            execSync(`zig build --global-cache-dir "${localCacheDir}"`, { 
                cwd: inputDir,
                stdio: 'inherit',
@@ -152,9 +167,9 @@ pub fn build(b: *std.Build) void {
        } catch (err) {
            console.error('❌ Zig Compilation Failed.');
        } finally {
+           // Cleanup
            if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
            if (fs.existsSync(noLibcPath)) fs.unlinkSync(noLibcPath);
-
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
            for (const dir of dirs) {
                const p = path.join(inputDir, dir);
