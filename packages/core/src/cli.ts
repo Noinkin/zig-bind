@@ -93,7 +93,10 @@ pub fn build(b: *std.Build) void {
 
     exe.entry = .disabled;
     exe.rdynamic = true;
-    ${isShared ? 'exe.import_memory = true;' : ''}
+    ${isShared ? `
+    exe.import_memory = true;
+    exe.shared_memory = true;
+    ` : ''}
     
     ${includePath}
     ${cSourceInclusion}
