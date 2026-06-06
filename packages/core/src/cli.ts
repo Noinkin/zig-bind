@@ -89,11 +89,11 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
        const buildZigContent = `const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const features = std.Target.Cpu.Feature.Set.empty;
     ${isShared ? `
+    var features = std.Target.Cpu.Feature.Set.empty;
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
-    ` : ''}
+    ` : 'const features = std.Target.Cpu.Feature.Set.empty;'}
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
