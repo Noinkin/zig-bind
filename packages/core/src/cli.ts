@@ -34,11 +34,13 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
         const cSourceInclusion = cFiles.map(file => `
             exe.root_module.addCSourceFile(.{
                 .file = b.path("${file}"),
-                .flags = &.{"-O3", "-DXXH_NO_LIBC", "-D__STDC_HOSTED__=0"},
+                .flags = &.{"-O3", "-DXXH_NO_LIBC"},
             });
         `).join('');
-
-        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));` : '';
+        
+        const includePath = fs.existsSync(libDir) ? `exe.root_module.addIncludePath(b.path("lib"));
+exe.root_module.addIncludePath(b.path("lib/include"))` : '';
+        if(includePath != '') ensureStubHeaders(libDir);
 
         const buildZigContent = `const std = @import("std");
 
@@ -109,6 +111,33 @@ pub fn build(b: *std.Build) void {
            }
        }
    });
+
+function ensureStubHeaders(libDir: string) {
+    const stubDir = path.join(libDir, 'include');
+    if (!fs.existsSync(stubDir)) {
+        fs.mkdirSync(stubDir);
+    }
+
+    const stdlibContent = `
+#pragma once
+#include <stddef.h> // Provides size_t
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+// Empty malloc/free stubs to satisfy the preprocessor
+void* malloc(size_t size);
+void free(void* ptr);
+`;
+    fs.writeFileSync(path.join(stubDir, 'stdlib.h'), stdlibContent);
+
+    const stringContent = `
+#pragma once
+#include <stddef.h>
+void* memcpy(void* dest, const void* src, size_t n);
+void* memset(void* s, int c, size_t n);
+`;
+    fs.writeFileSync(path.join(stubDir, 'string.h'), stringContent);
+}
 
 cli.help();
 cli.parse();
