@@ -27,28 +27,23 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
        const outputName = path.basename(inputFile, '.zig');
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
-       // --- SMART LIBRARY DETECTION ---
        const libDir = path.join(inputDir, '../lib');
        const detectedLibs = new Set();
        let cFiles: any[] = [];
 
        if (fs.existsSync(libDir)) {
            const files = fs.readdirSync(libDir);
-           // Detect all .h files to define library-specific macros
            files.forEach(f => {
                if (f.endsWith('.h')) {
                    const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
                    detectedLibs.add(libName);
                }
            });
-           // Collect .c files for compilation
            cFiles = files.filter(file => file.endsWith('.c'));
        }
 
-       // --- DYNAMIC NO_LIBC GENERATOR ---
        const noLibcPath = path.join(inputDir, 'no_libc.h');
        
-       // Start with generic system overrides
        let noLibcContent = `
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
@@ -70,7 +65,6 @@ float ceilf(float x) { return __builtin_ceilf(x); }
 float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
 `;
 
-       // Inject detected library macros automatically
        detectedLibs.forEach(lib => {
            noLibcContent += `\n#define ${lib}_NO_LIBC 1\n#define ${lib}_NO_STDLIB 1`;
        });
@@ -83,7 +77,6 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
-       // --- BUILD SCRIPT GENERATION ---
        const cSourceInclusion = cFiles.map(file => `
            exe.root_module.addCSourceFile(.{
                .file = b.path("lib/${file}"),
@@ -96,7 +89,7 @@ float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
        const buildZigContent = `const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    var features = std.Target.Cpu.Feature.Set.empty;
+    const features = std.Target.Cpu.Feature.Set.empty;
     ${isShared ? `
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
