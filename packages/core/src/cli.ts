@@ -96,6 +96,8 @@ pub fn build(b: *std.Build) void {
     ${isShared ? `
     exe.import_memory = true;
     exe.shared_memory = true;
+
+    exe.max_memory = 8192 * 65536;
     ` : ''}
     
     ${includePath}
