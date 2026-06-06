@@ -29,14 +29,25 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 
        const libDir = path.join(inputDir, '../lib');
        const detectedLibs = new Set();
+       const neededIncludes = new Set();
        let cFiles: any[] = [];
 
        if (fs.existsSync(libDir)) {
            const files = fs.readdirSync(libDir);
            files.forEach(f => {
-               if (f.endsWith('.h')) {
-                   const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-                   detectedLibs.add(libName);
+               const filePath = path.join(libDir, f);
+               if (f.endsWith('.h') || f.endsWith('.c')) {
+                   const content = fs.readFileSync(filePath, 'utf-8');
+                   
+                   if (f.endsWith('.h')) {
+                       const libName = path.basename(f, '.h').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+                       detectedLibs.add(libName);
+                   }
+
+                   const matches = content.matchAll(/^#\s*include\s*[<]([^>]+)[>]/gm);
+                   for (const match of matches) {
+                       neededIncludes.add(match[1]);
+                   }
                }
            });
            cFiles = files.filter(file => file.endsWith('.c'));
@@ -48,14 +59,21 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
 #ifndef NO_LIBC_H
 #define NO_LIBC_H
 
-// System Header Guards
-#define _STRING_H
-#define _MATH_H
-#define _STDLIB_H
+`;
 
-// Generic System Overrides
-void* memcpy(void* dest, const void* src, unsigned long n) { return __builtin_memcpy(dest, src, n); }
+       if (neededIncludes.has('string.h')) {
+           noLibcContent += `
+#define _STRING_H
+void* memcpy(void* d, const void* s, unsigned long n) { return __builtin_memcpy(d, s, n); }
 void* memset(void* s, int c, unsigned long n) { return __builtin_memset(s, c, n); }
+void* memmove(void* d, const void* s, unsigned long n) { return __builtin_memmove(d, s, n); }
+int memcmp(const void* s1, const void* s2, unsigned long n) { return __builtin_memcmp(s1, s2, n); }
+`;
+       }
+
+       if (neededIncludes.has('math.h')) {
+           noLibcContent += `
+#define _MATH_H
 float sqrtf(float x) { return __builtin_sqrtf(x); }
 float cosf(float x) { return __builtin_cosf(x); }
 float sinf(float x) { return __builtin_sinf(x); }
@@ -64,6 +82,7 @@ float floorf(float x) { return __builtin_floorf(x); }
 float ceilf(float x) { return __builtin_ceilf(x); }
 float atan2f(float y, float x) { return __builtin_atan2f(y, x); }
 `;
+       }
 
        detectedLibs.forEach(lib => {
            noLibcContent += `\n#define ${lib}_NO_LIBC 1\n#define ${lib}_NO_STDLIB 1`;
@@ -138,7 +157,6 @@ pub fn build(b: *std.Build) void {
        console.log(`⚡ Detected Libraries: ${Array.from(detectedLibs).join(', ')}`);
        console.log(`⚡ Compiling: ${inputFile}...`);
 
-       // --- EXECUTION ---
        try {
            const localCacheDir = path.join(inputDir, '.zig-global-cache');
            execSync(`zig build --global-cache-dir "${localCacheDir}"`, { 
@@ -160,7 +178,6 @@ pub fn build(b: *std.Build) void {
        } catch (err) {
            console.error('❌ Zig Compilation Failed.');
        } finally {
-           // Cleanup
            if (fs.existsSync(buildZigPath)) fs.unlinkSync(buildZigPath);
            if (fs.existsSync(noLibcPath)) fs.unlinkSync(noLibcPath);
            const dirs = ['zig-out', '.zig-cache', '.zig-global-cache', '.zig-appdata'];
