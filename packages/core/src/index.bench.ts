@@ -25,7 +25,7 @@ async function runBenchmarkSuite() {
         const std = @import("std");
         const zb = @import("zig_bind");
 
-        export fn zig_bind_alloc(bytes: usize) [*]u8 { return zb.alloc(bytes); }
+        export fn zig_bind_alloc(bytes: usize) ?[*]u8 { return zb.alloc(bytes); }
         export fn zig_bind_reset() void { zb.reset(); }
 
         export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {

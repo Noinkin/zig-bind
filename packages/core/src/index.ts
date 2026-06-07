@@ -23,9 +23,9 @@ export class ZigBindRegistry {
     private readonly encoder = new TextEncoder();
     private readonly decoder = new TextDecoder();
 
-    constructor(wasmInstance: WebAssembly.Instance) {
+    constructor(wasmInstance: WebAssembly.Instance, memoryOverride?: WebAssembly.Memory) {
         this.exports = wasmInstance.exports;
-        this.memory = this.exports.memory;
+        this.memory = memoryOverride || this.exports.memory;
     }
 
     /**

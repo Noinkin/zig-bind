@@ -15,13 +15,13 @@ pub fn build(b: *std.Build) void {
     });
 
     const root_mod = b.createModule(.{
-        .root_source_file = b.path("custom_math_bench.zig"),
+        .root_source_file = b.path("custom_math_fixtures.zig"),
         .target = target,
         .optimize = .ReleaseFast,
     });
 
     const exe = b.addExecutable(.{
-        .name = "custom_math_bench",
+        .name = "custom_math_fixtures",
         .root_module = root_mod,
     });
 
