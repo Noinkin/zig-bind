@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const pool_size = 16 * 1024 * 1024;
+const pool_size = 64 * 1024 * 1024;
 var memory_pool: [pool_size]u8 align(64) = [_]u8{0} ** pool_size;
 var pool_offset: usize = 0;
 
