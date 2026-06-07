@@ -49,7 +49,7 @@ describe('User Custom Extension Pipeline Verification', () => {
         `;
         fs.writeFileSync(testCustomZigFile, customZigContent);
 
-        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}" --mode fast`);
+        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}" --mode fast --standalone`);
     }, 50000);
 
     afterAll(() => {

@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .wasi,
+        .os_tag = .freestanding,
         .cpu_features_add = features,
     });
 
@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
         .root_module = root_mod,
     });
 
-    exe.root_module.link_libc = true;
+    
 
     exe.entry = .disabled;
     exe.rdynamic = true;

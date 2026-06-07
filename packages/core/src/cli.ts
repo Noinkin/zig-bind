@@ -25,11 +25,13 @@ cli.command('build <inputFile>', 'Compiles a user Zig file with the zero-copy fr
    .option('--shared', 'Enable shared memory and atomics for multi-threaded worker pools')
    .option('--mode <mode>', 'Build mode: debug, fast, small', { default: 'fast' })
    .option('--clean', 'Force a clean build by clearing caches')
+   .option('--standalone', 'Uses standalone(No WASI)')
    .action((inputFile, options) => {
        const absoluteInputPath = path.resolve(inputFile);
        const outputDir = path.resolve(options.out || './dist');
        const isShared = !!options.shared;
        const mode: string = options.mode;
+       const standalone = options.standalone;
        
        if (!fs.existsSync(absoluteInputPath)) {
            console.error(`❌ Error: Input file not found at ${absoluteInputPath}`);
@@ -93,7 +95,7 @@ pub fn build(b: *std.Build) void {
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .wasi,
+        .os_tag = ${standalone ? '.freestanding' : '.wasi'},
         .cpu_features_add = features,
     });
 
@@ -108,7 +110,7 @@ pub fn build(b: *std.Build) void {
         .root_module = root_mod,
     });
 
-    exe.root_module.link_libc = true;
+    ${standalone ? '' : 'exe.root_module.link_libc = true;'}
 
     exe.entry = .disabled;
     exe.rdynamic = true;
