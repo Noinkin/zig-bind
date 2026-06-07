@@ -37,6 +37,7 @@ export class ZigBindRegistry {
         const size = isArray ? (source as any).length : (source as number);
         
         const ptr = this.exports.zig_bind_alloc(size * meta.size);
+        if (ptr === 0 || ptr === null) throw new Error(`Out of Memory! Failed to allocate ${size} bytes.`);
         const view = new meta.Ctor(this.memory.buffer, ptr, size) as any;
         view.ptr = ptr;
 
