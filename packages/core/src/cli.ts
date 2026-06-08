@@ -14,6 +14,7 @@ const getRecursiveFiles = (dir: string, extension: string): string[] => {
     for (const item of items) {
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
+            if (item.name.startsWith('.')) continue;
             files = files.concat(getRecursiveFiles(fullPath, extension));
         } else if (item.name.endsWith(extension)) {
             files.push(fullPath);
@@ -177,7 +178,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        for (const inputPath of normalizedInputPaths) {
            const absolutePath = path.resolve(inputPath);
            if (!fs.existsSync(absolutePath)) {
-               console.error(`❌ Error: Input path not found at ${absolutePath}`);
+               console.error(`Error: Input path not found at ${absolutePath}`);
                process.exit(1);
            }
 
@@ -190,7 +191,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        }
 
        if (zigFiles.length === 0) {
-           console.error(`❌ Error: No .zig files found to compile.`);
+           console.error(`Error: No .zig files found to compile.`);
            process.exit(1);
        }
 
@@ -319,7 +320,7 @@ pub fn build(b: *std.Build) void {
 
        fs.writeFileSync(buildZigPath, buildZigContent);
 
-       console.log(`⚡ Compiling target files (${zigFiles.length} files total)...`);
+       console.log(`Compiling target files (${zigFiles.length} files total)...`);
 
        try {
            const localCacheDir = path.join(inputDir, '.zig-global-cache');
