@@ -159,6 +159,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
    .option('--mode <mode>', 'Build mode: debug, fast, small', { default: 'fast' })
    .option('--clean', 'Force a clean build by clearing caches')
    .option('--standalone', 'Uses standalone (No WASI)')
+   .option('--nocsimd', 'Removes the -msimd128 flag in c compilation')
    .action((inputPaths: string | string[], options) => {
        const outputDir = path.resolve(options.out || './dist');
        const isShared = !!options.shared;
@@ -166,6 +167,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        const standalone = options.standalone;
        const isTypeScriptMode = options.ts !== undefined && options.ts !== false;
        const tsOutputDir = (typeof options.ts === 'string') ? path.resolve(options.ts) : null;
+       const csimd = options.nocsimd == undefined;
 
        const rawPaths = Array.isArray(inputPaths) 
            ? inputPaths 
@@ -211,7 +213,8 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
            cFiles = getRecursiveFiles(libDir, '.c');
        }
 
-       const baseCFlags = ["-O3", "-msimd128", "-mbulk-memory", "-Ilib"];
+       const baseCFlags = ["-O3", "-mbulk-memory", "-Ilib"];
+       if (csimd) baseCFlags.push("-msimd128")
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
