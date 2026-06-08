@@ -23,19 +23,15 @@ async function runBenchmarkSuite() {
 
     const customZigContent = `
         const std = @import("std");
-        const zb = @import("zig_bind");
 
-        export fn zig_bind_alloc(bytes: usize) ?[*]u8 { return zb.alloc(bytes); }
-        export fn zig_bind_reset() void { zb.reset(); }
-
-        export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {
+        pub export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {
             var i: usize = 0;
             while (i < len) : (i += 1) {
                 c_ptr[i] = a_ptr[i] + b_ptr[i];
             }
         }
 
-        export fn scale_vector(input_ptr: [*]f32, output_ptr: [*]f32, len: usize) void {
+        pub export fn scale_vector(input_ptr: [*]f32, output_ptr: [*]f32, len: usize) void {
             var i: usize = 0;
             while (i < len) : (i += 1) {
                 output_ptr[i] = input_ptr[i] * 2.5;
@@ -144,7 +140,7 @@ async function runBenchmarkSuite() {
 
     if (fs.existsSync(testCustomZigFile)) fs.unlinkSync(testCustomZigFile);
     if (fs.existsSync(expectedWasmFile)) fs.unlinkSync(expectedWasmFile);
-    if (fs.existsSync(testWasmOutputDir)) fs.rmdirSync(testWasmOutputDir);
+    if (fs.existsSync(testWasmOutputDir)) fs.rmSync(testWasmOutputDir, { recursive: true, force: true });
 }
 
 runBenchmarkSuite().catch(console.error);

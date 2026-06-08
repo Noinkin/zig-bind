@@ -15,47 +15,49 @@ const wasi = new WASI({
 describe('User Custom Extension Pipeline Verification', () => {
     const testCustomZigFile = path.join(__dirname, 'custom_math_fixtures.zig');
     const testWasmOutputDir = path.join(__dirname, 'dist_test');
+    const testTSOutputDir = path.join(__dirname);
+    const expectedTSFile = path.join(testTSOutputDir, 'custom_math_fixtures.ts');
     const expectedWasmFile = path.join(testWasmOutputDir, 'custom_math_fixtures.wasm');
 
     const cliBinaryPath = path.resolve(__dirname, '../dist/cli.js');
 
     beforeAll(() => {
         const customZigContent = `
-            const std = @import("std");
-            const zb = @import("zig_bind");
+const std = @import("std");
 
-            export fn zig_bind_alloc(bytes: usize) ?[*]u8 { return zb.alloc(bytes); }
-            export fn zig_bind_reset() void { zb.reset(); }
+/// Adds vector a to vector b
+/// @param a - Pointer to the first vector
+/// @param b - Pointer to the second vector
+pub export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {
+    var i: usize = 0;
+    while (i < len) : (i += 1) {
+        c_ptr[i] = a_ptr[i] + b_ptr[i];
+    }
+}
 
-            export fn add_vectors(a_ptr: [*]f32, b_ptr: [*]f32, c_ptr: [*]f32, len: usize) void {
-                var i: usize = 0;
-                while (i < len) : (i += 1) {
-                    c_ptr[i] = a_ptr[i] + b_ptr[i];
-                }
-            }
+pub export fn process_string(ptr: [*]u8, len: usize) u32 {
+    _ = ptr; 
+    return @as(u32, @intCast(len));
+}
 
-            export fn process_string(ptr: [*]u8, len: usize) u32 {
-                _ = ptr; 
-                return @as(u32, @intCast(len));
-            }
-
-            export fn process_json(ptr: [*]u8, len: usize) i32 {
-                const json_slice = ptr[0..len];
-                const allocator = std.heap.page_allocator;
-                const parsed = std.json.parseFromSlice(struct { val: i32 }, allocator, json_slice, .{}) catch return -1;
-                defer parsed.deinit();
-                return parsed.value.val + 5;
-            }
-        `;
+pub export fn process_json(ptr: [*]u8, len: usize) i32 {
+    const json_slice = ptr[0..len];
+    const allocator = std.heap.page_allocator;
+    const parsed = std.json.parseFromSlice(struct { val: i32 }, allocator, json_slice, .{}) catch return -1;
+    defer parsed.deinit();
+    return parsed.value.val + 5;
+}
+`;
         fs.writeFileSync(testCustomZigFile, customZigContent);
 
-        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}" --mode fast --standalone`);
+        execSync(`node "${cliBinaryPath}" build "${testCustomZigFile}" --out "${testWasmOutputDir}" --mode fast --standalone --ts "${testTSOutputDir}"`);
     }, 50000);
 
     afterAll(() => {
         if (fs.existsSync(testCustomZigFile)) fs.unlinkSync(testCustomZigFile);
         if (fs.existsSync(expectedWasmFile)) fs.unlinkSync(expectedWasmFile);
-        if (fs.existsSync(testWasmOutputDir)) fs.rmdirSync(testWasmOutputDir);
+        if (fs.existsSync(expectedTSFile)) fs.unlinkSync(expectedTSFile);
+        if (fs.existsSync(testWasmOutputDir)) fs.rmSync(testWasmOutputDir, { recursive: true, force: true });
     });
 
     test('should load the user-extendable compiled binary and compute correct zero-copy structures', async () => {
