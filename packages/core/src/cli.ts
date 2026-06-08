@@ -159,7 +159,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
    .option('--mode <mode>', 'Build mode: debug, fast, small', { default: 'fast' })
    .option('--clean', 'Force a clean build by clearing caches')
    .option('--standalone', 'Uses standalone (No WASI)')
-   .option('--nocsimd', 'Removes the -msimd128 flag in c compilation')
+   .option('--nosimd', 'Removes simd in compilation')
    .action((inputPaths: string | string[], options) => {
        const outputDir = path.resolve(options.out || './dist');
        const isShared = !!options.shared;
@@ -167,7 +167,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        const standalone = options.standalone;
        const isTypeScriptMode = options.ts !== undefined && options.ts !== false;
        const tsOutputDir = (typeof options.ts === 'string') ? path.resolve(options.ts) : null;
-       const csimd = options.nocsimd == undefined;
+       const simd = options.nosimd == undefined;
 
        const rawPaths = Array.isArray(inputPaths) 
            ? inputPaths 
@@ -214,7 +214,7 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        }
 
        const baseCFlags = ["-O3", "-mbulk-memory", "-Ilib"];
-       if (csimd) baseCFlags.push("-msimd128")
+       if (simd) baseCFlags.push("-msimd128")
        if (isShared) baseCFlags.push("-matomics");
        const formattedCFlags = baseCFlags.map(f => `"${f}"`).join(', ');
 
@@ -274,12 +274,12 @@ pub export fn zig_bind_reset() void {
 // THIS FILE IS AUTO GENERATED, TO INJECT LINES MAKE A 'build_inject.zig' FILE IN THE INPUT DIRECTORY       
 const std = @import("std");
 pub fn build(b: *std.Build) void {
-    var features = std.Target.Cpu.Feature.Set.empty;
+    ${(!simd && !isShared) ? 'const' : 'var'} features = std.Target.Cpu.Feature.Set.empty;
     ${isShared ? `
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
     ` : ''}
-    features.addFeature(@intFromEnum(std.Target.wasm.Feature.simd128));
+    ${simd ? `features.addFeature(@intFromEnum(std.Target.wasm.Feature.simd128));` : ``}
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,

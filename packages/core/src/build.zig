@@ -1,3 +1,5 @@
+
+// THIS FILE IS AUTO GENERATED, TO INJECT LINES MAKE A 'build_inject.zig' FILE IN THE INPUT DIRECTORY       
 const std = @import("std");
 pub fn build(b: *std.Build) void {
     var features = std.Target.Cpu.Feature.Set.empty;
@@ -6,7 +8,7 @@ pub fn build(b: *std.Build) void {
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .wasi,
+        .os_tag = .freestanding,
         .cpu_features_add = features,
     });
 
@@ -17,11 +19,11 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "custom_math_bench",
+        .name = "custom_math_fixtures",
         .root_module = root_mod,
     });
 
-    exe.root_module.link_libc = true;
+    
     exe.entry = .disabled;
     exe.rdynamic = true;
     
