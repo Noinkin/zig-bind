@@ -87,7 +87,7 @@ const generateArtifacts = (zigFiles: string[], options: { outputDir: string; tsO
             const rawParams = match[2];
             const rawReturn = match[3];
 
-            if (fnName === 'zig_bind_alloc' || fnName === 'zig_bind_reset') continue;
+            if (fnName === 'zig_bind_alloc' || fnName === 'zig_bind_reset' || fnName === 'zig_bind_worker_loop') continue;
 
             const jsDocBlock = extractJsDoc(fileContent, matchIndex);
 
@@ -262,6 +262,10 @@ pub export fn zig_bind_alloc(bytes: usize) ?[*]u8 {
 
 pub export fn zig_bind_reset() void { 
     zb.reset(); 
+}
+
+pub export fn zig_bind_worker_loop() void {
+    zb.workerLoop();
 }
 `;
        

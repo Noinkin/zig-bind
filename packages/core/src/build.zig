@@ -4,6 +4,9 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     var features = std.Target.Cpu.Feature.Set.empty;
     
+    features.addFeature(@intFromEnum(std.Target.wasm.Feature.atomics));
+    features.addFeature(@intFromEnum(std.Target.wasm.Feature.bulk_memory));
+    
     features.addFeature(@intFromEnum(std.Target.wasm.Feature.simd128));
 
     const target = b.resolveTargetQuery(.{
@@ -26,6 +29,10 @@ pub fn build(b: *std.Build) void {
     
     exe.entry = .disabled;
     exe.rdynamic = true;
+    
+    exe.import_memory = true;
+    exe.shared_memory = true;
+    exe.max_memory = 8192 * 65536;
     
     
     

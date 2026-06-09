@@ -18,6 +18,7 @@ const TYPE_METADATA: Record<ZigBindType, { Ctor: any, size: number }> = {
  * Zig/WASM binding registry
  */
 export class ZigBindRegistry {
+    public static threadCount: number = 4;
     private readonly exports: any;
     public memory: WebAssembly.Memory;
     private readonly encoder = new TextEncoder();
@@ -26,6 +27,161 @@ export class ZigBindRegistry {
     constructor(wasmInstance: WebAssembly.Instance, memoryOverride?: WebAssembly.Memory) {
         this.exports = wasmInstance.exports;
         this.memory = memoryOverride || this.exports.memory;
+    }
+
+    static createSharedMemory(initialPages = 256, maxPages = 2048): WebAssembly.Memory {
+        return new WebAssembly.Memory({
+            initial: initialPages,
+            maximum: maxPages,
+            shared: true
+        });
+    }
+
+    static async createImportObject(wasmModule: WebAssembly.Module, sharedMemory: WebAssembly.Memory): Promise<any> {
+        const imports = WebAssembly.Module.imports(wasmModule);
+        const usesWasi = imports.some(imp => imp.module === 'wasi_snapshot_preview1');
+        
+        const importObject: any = {
+            env: { memory: sharedMemory }
+        };
+
+        if (usesWasi) {
+            const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+            if (isNode) {
+                const { WASI } = await import('wasi');
+                const wasi = new WASI({ version: 'preview1', args: [], env: process.env });
+                importObject.wasi_snapshot_preview1 = wasi.wasiImport;
+                importObject.__wasi_instance__ = wasi; 
+            } else {
+                if (typeof (globalThis as any).WASI !== 'undefined') {
+                    const wasi = new (globalThis as any).WASI();
+                    importObject.wasi_snapshot_preview1 = wasi.wasiImport;
+                    importObject.__wasi_instance__ = wasi;
+                } else {
+                    importObject.wasi_snapshot_preview1 = new Proxy({}, {
+                        get: () => () => 0
+                    });
+                }
+            }
+        }
+
+        return importObject;
+    }
+
+    static async instantiateModule(wasmModule: WebAssembly.Module, sharedMemory: WebAssembly.Memory): Promise<WebAssembly.Instance> {
+        const importObject = await ZigBindRegistry.createImportObject(wasmModule, sharedMemory);
+        const instance = await WebAssembly.instantiate(wasmModule, importObject);
+        
+        if (importObject.__wasi_instance__) {
+            const wasi = importObject.__wasi_instance__;
+            
+            if (typeof wasi.finalizeBindings === 'function') {
+                wasi.finalizeBindings(instance, { memory: sharedMemory });
+            } else if (typeof wasi.initialize === 'function') {
+                if (instance.exports._start === undefined) {
+                    wasi.initialize(instance);
+                }
+            }
+        }
+        return instance;
+    }
+
+    static async initNativeThreads(wasmModule: WebAssembly.Module, sharedMemory: WebAssembly.Memory, threadCount?: number): Promise<void> {
+        const imports = WebAssembly.Module.imports(wasmModule);
+        const usesWasi = imports.some(imp => imp.module === 'wasi_snapshot_preview1');
+
+        const count = threadCount || (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : require('os').cpus().length || 4);
+        ZigBindRegistry.threadCount = count;
+
+        const STACK_SIZE = 65536;
+        const WORKER_STACK_BASE = 1024 * 1024 * 16;
+
+        const workerCode = `
+            const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+            const channel = isNode ? require('worker_threads').parentPort : self;
+            
+            const onMessage = async (msg) => {
+                const data = msg.data !== undefined ? msg.data : msg;
+                if (data.type === 'start') {
+                    const importObject = {
+                        env: { memory: data.memory }
+                    };
+
+                    let wasiInstance = null;
+                    if (data.usesWasi) {
+                        if (isNode) {
+                            const { WASI } = require('wasi');
+                            wasiInstance = new WASI({ version: 'preview1', args: [], env: process.env });
+                            importObject.wasi_snapshot_preview1 = wasiInstance.wasiImport;
+                        } else {
+                            if (typeof self.WASI !== 'undefined') {
+                                wasiInstance = new self.WASI();
+                                importObject.wasi_snapshot_preview1 = wasiInstance.wasiImport;
+                            } else {
+                                importObject.wasi_snapshot_preview1 = new Proxy({}, {
+                                    get: () => () => 0
+                                });
+                            }
+                        }
+                    }
+
+                    const instance = await WebAssembly.instantiate(data.module, importObject);
+
+                    if (wasiInstance) {
+                        if (typeof wasiInstance.finalizeBindings === 'function') {
+                            wasiInstance.finalizeBindings(instance, { memory: data.memory });
+                        } else if (typeof wasiInstance.initialize === 'function') {
+                            const wrappedInstance = new Proxy(instance, {
+                                get(target, prop) {
+                                    if (prop === 'exports') {
+                                        return new Proxy(target.exports, {
+                                            get(expTarget, expProp) {
+                                                if (expProp === 'memory') return data.memory;
+                                                return expTarget[expProp];
+                                            }
+                                        });
+                                    }
+                                    return target[prop];
+                                }
+                            });
+                            wasiInstance.initialize(wrappedInstance);
+                        }
+                    }
+
+                    if (instance.exports.__stack_pointer) {
+                        const uniqueStackPtr = data.stackBase + (data.threadId * data.stackSize);
+                        instance.exports.__stack_pointer.value = uniqueStackPtr;
+                    }
+
+                    instance.exports.zig_bind_worker_loop();
+                }
+            };
+            
+            if (isNode) { channel.on('message', onMessage); } else { channel.onmessage = onMessage; }
+        `;
+
+        const createWorker = async (code: string) => {
+            if (typeof window === 'undefined' && typeof process !== 'undefined') {
+                const { Worker } = await import('worker_threads');
+                return new Worker(code, { eval: true });
+            } else {
+                const blob = new Blob([code], { type: 'application/javascript' });
+                return new Worker(URL.createObjectURL(blob));
+            }
+        };
+
+        for (let i = 0; i < count; i++) {
+            const worker = await createWorker(workerCode);
+            worker.postMessage({ 
+                type: 'start', 
+                module: wasmModule, 
+                memory: sharedMemory,
+                threadId: i,
+                stackBase: WORKER_STACK_BASE,
+                stackSize: STACK_SIZE,
+                usesWasi: usesWasi
+            });
+        }
     }
 
     /**
