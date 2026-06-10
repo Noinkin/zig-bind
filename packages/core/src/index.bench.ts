@@ -16,7 +16,9 @@ const __dirname = import.meta.dirname;
 async function runBenchmarkSuite() {
     const testCustomZigFile = path.join(__dirname, 'custom_math_bench.zig');
     const testWasmOutputDir = path.join(__dirname, 'dist_bench');
-    const expectedWasmFile = path.join(testWasmOutputDir, 'custom_math_bench.wasm');
+    const expectedWasmFile = path.join(__dirname, 'dist_bench.wasm');
+    const expectedDTSFile = path.join(__dirname, 'dist_bench.d.ts');
+    const expectedJSFile = path.join(__dirname, 'dist_bench.js');
     const cliBinaryPath = path.resolve(__dirname, '../dist/cli.js');
 
     console.log('⚡ Compiling Zig binaries for benchmark profiles...');
@@ -185,7 +187,8 @@ async function runBenchmarkSuite() {
 
     if (fs.existsSync(testCustomZigFile)) fs.unlinkSync(testCustomZigFile);
     if (fs.existsSync(expectedWasmFile)) fs.unlinkSync(expectedWasmFile);
-    if (fs.existsSync(testWasmOutputDir)) fs.rmSync(testWasmOutputDir, { recursive: true, force: true });
+    if (fs.existsSync(expectedDTSFile)) fs.unlinkSync(expectedDTSFile);
+    if (fs.existsSync(expectedJSFile)) fs.unlinkSync(expectedJSFile);
 }
 
 runBenchmarkSuite().catch(console.error);

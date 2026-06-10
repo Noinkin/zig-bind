@@ -16,8 +16,8 @@ describe('User Custom Extension Pipeline Verification', () => {
     const testCustomZigFile = path.join(__dirname, 'custom_math_fixtures.zig');
     const testWasmOutputDir = path.join(__dirname, 'dist_test');
     const testTSOutputDir = path.join(__dirname);
-    const expectedTSFile = path.join(testTSOutputDir, 'custom_math_fixtures.ts');
-    const expectedWasmFile = path.join(testWasmOutputDir, 'custom_math_fixtures.wasm');
+    const expectedTSFile = path.join(__dirname, 'dist_test.ts');
+    const expectedWasmFile = path.join(__dirname, 'dist_test.wasm');
 
     const cliBinaryPath = path.resolve(__dirname, '../dist/cli.js');
 
@@ -72,7 +72,6 @@ pub export fn parallel_matrix_multiply(matrix_a: [*]f32, matrix_b: [*]f32, resul
         if (fs.existsSync(testCustomZigFile)) fs.unlinkSync(testCustomZigFile);
         if (fs.existsSync(expectedWasmFile)) fs.unlinkSync(expectedWasmFile);
         if (fs.existsSync(expectedTSFile)) fs.unlinkSync(expectedTSFile);
-        if (fs.existsSync(testWasmOutputDir)) fs.rmSync(testWasmOutputDir, { recursive: true, force: true });
     });
 
     test('should load the user-extendable compiled binary and compute correct zero-copy structures', async () => {

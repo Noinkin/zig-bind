@@ -74,7 +74,6 @@ const generateArtifacts = (zigFiles: string[], options: { outputDir: string; tsO
     
     let tsDirectVariables = '';
     let tsInitAssignments = '';
-    let tsExportList = '';
 
     for (const file of zigFiles) {
         const fileContent = fs.readFileSync(file, 'utf-8');
@@ -110,7 +109,9 @@ const generateArtifacts = (zigFiles: string[], options: { outputDir: string; tsO
             const jsParams = jsParamsList.join(', ');
             const returnType = mapZigTypeToTS(rawReturn!);
 
-            jsFunctions += `${jsDocBlock}        ${fnName}(${jsParams}) {\n            return e.${fnName}(${jsParams});\n        },\n`;
+            jsFunctions += `${jsDocBlock}        ${fnName}(${jsParams}) {
+            return e.${fnName}(${jsParams});
+        },\n`;
             dtsFunctions += `${jsDocBlock}    ${fnName}(${tsParams}): ${returnType};\n`;
 
             tsDirectVariables += `${jsDocBlock}export let ${fnName}: (${tsParams}) => ${returnType} = null as any;\n`;
@@ -119,7 +120,7 @@ const generateArtifacts = (zigFiles: string[], options: { outputDir: string; tsO
     }
 
     if (isTypeScriptMode) {
-        const finalTsDir = tsOutputDir! ? tsOutputDir : outputDir;
+        const finalTsDir = tsOutputDir ? tsOutputDir : outputDir;
         fs.mkdirSync(finalTsDir, { recursive: true });
 
         const tsPath = path.join(finalTsDir, `${outputName}.ts`);
@@ -153,7 +154,7 @@ ${tsInitAssignments}
 const cli = cac('zig-bind');
 
 cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory of Zig files')
-   .option('--out <dir>', 'Output directory', { default: './dist' })
+   .option('--out <file>', 'Output target file prefix/path', { default: './dist/wasm_bundle' })
    .option('--ts [dir]', 'Output a single unified .ts file instead of separate js/d.ts pairs. Optional destination folder path can be passed.')
    .option('--shared', 'Enable shared memory and atomics for multi-threaded worker pools')
    .option('--mode <mode>', 'Build mode: debug, fast, small', { default: 'fast' })
@@ -161,7 +162,14 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
    .option('--standalone', 'Uses standalone (No WASI)')
    .option('--nosimd', 'Removes simd in compilation')
    .action((inputPaths: string | string[], options) => {
-       const outputDir = path.resolve(options.out || './dist');
+       const fullOutputPath = path.resolve(options.out || './dist/wasm_bundle');
+       const outputDir = path.dirname(fullOutputPath);
+       
+       const outputExt = path.extname(fullOutputPath);
+       const outputName = outputExt === '.wasm' 
+           ? path.basename(fullOutputPath, '.wasm') 
+           : path.basename(fullOutputPath);
+
        const isShared = !!options.shared;
        const mode: string = options.mode;
        const standalone = options.standalone;
@@ -204,7 +212,6 @@ cli.command('build <inputPaths...>', 'Compiles a Zig file, files, or a directory
        const buildZigPath = path.join(inputDir, 'build.zig');
        const coreEnginePath = path.resolve(import.meta.dirname, '../zig/zig_bind.zig').replace(/\\/g, '/');
        
-       const outputName = zigFiles.length === 1 ? path.basename(firstFileAbsolute!, '.zig') : 'math_bundle';
        const finalWasmOutput = path.join(outputDir, `${outputName}.wasm`);
 
        const libDir = path.join(inputDir, '../lib');

@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
-        .os_tag = .freestanding,
+        .os_tag = .wasi,
         .cpu_features_add = features,
     });
 
@@ -22,11 +22,11 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "custom_math_fixtures",
+        .name = "dist_bench",
         .root_module = root_mod,
     });
 
-    
+    exe.root_module.link_libc = true;
     exe.entry = .disabled;
     exe.rdynamic = true;
     
